@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bingbing · 越狱开关台</title>
+<style>
+  /* ── cold-tiger / brutalism（动效照搬 Uiverse.io by 0xnihilism，MIT）──
+     三个刻意的改动，为了在真实浮层里能用：
+       1. tv-flicker 从 .5 压到 .32 —— 原版是展示卡，字大；我们 11px 数据表会被闪花
+       2. 卡其边框 10px → 6px、硬投影 9/11 → 6/8 —— 不占那么多版面
+       3. 眼睛透明度 .13 → .12 且贴右下角 —— 不压数字
+  */
+  :root {
+    --bg: #0a0a0a;
+    --panel: #1c1a16;
+    --panel-deep: #141310;
+    --khaki: rgb(161, 156, 116);
+    --khaki-hi: rgb(198, 181, 113);
+    --khaki-dim: #5a5442;
+    --text: #e8e2cf;
+    --muted: #a9a288;
+    --faint: #6b6656;
+    --line: rgba(115, 112, 92, .45);
+    --ok: #8fe39b;
+    --bad: #ff6b5e;
+    --warn: #e8b45c;
+    --mono: "Courier New", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(900px 500px at 50% -10%, #191712 0%, var(--bg) 65%);
+    color: var(--text);
+    font: 13px/1.6 var(--mono);
+    padding: 26px 22px 70px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  /* Big Brother 的眼球：贴右下角出血，只露一只（源自 Uiverse by 0xnihilism
+     的 brown-puma-30，原版是 280×280 的展示框，这里缩成眼角装饰）*/
+  .bg-eye {
+    position: fixed; right: -58px; bottom: -24px; width: 190px; height: 70px;
+    z-index: 0; pointer-events: none; opacity: .40;
+  }
+  .bg-eye .sclera {
+    position: absolute; inset: 0; background: #fff; border-radius: 50%; overflow: hidden;
+    animation: eye-pulse 2s infinite;
+  }
+  @keyframes eye-pulse { 0%,100% { transform: scale(1) } 50% { transform: scale(1.05) } }
+  .bg-eye .pupil {
+    position: absolute; top: 50%; left: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px;
+    background: #000; border-radius: 50%; animation: eye-look 4s infinite ease-in-out;
+  }
+  @keyframes eye-look { 0%,100% { transform: translateX(0) } 25% { transform: translateX(10px) } 75% { transform: translateX(-10px) } }
+  .bg-eye .pupil::after {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; border-radius: 50%;
+    background: radial-gradient(circle, #ff2b2b 0%, transparent 70%); opacity: .9;
+  }
+  .bg-eye .lid {
+    position: absolute; left: 0; right: 0; top: 0; height: 0; background: var(--bg);
+    animation: eye-blink 4s infinite;
+  }
+  @keyframes eye-blink { 0%, 90%, 100% { height: 0 } 95% { height: 100% } }
+  /* 扫描线：整页一层，静态抖动 */
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 9998; pointer-events: none; opacity: .22;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 3px);
+    animation: tv-static .2s infinite linear alternate;
+  }
+  @keyframes tv-static { 0% { opacity: .22 } 100% { opacity: .10 } }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 {
+    font-size: 17px; margin: 0; letter-spacing: 3px; text-transform: uppercase;
+    color: #fff; text-shadow: 3px 3px #000;
+  }
+  h1 span { color: var(--faint); font-weight: 400; font-size: 11.5px; margin-left: 9px; letter-spacing: 1px; }
+  .pill {
+    font: 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase;
+    padding: 5px 9px; border: 1px solid var(--line); background: var(--panel-deep); color: var(--muted);
+  }
+  .pill.on { color: var(--ok); border-color: rgba(143,227,155,.45); background: rgba(10,26,14,.7); }
+  .pill.off { color: var(--bad); border-color: rgba(255,107,94,.4); background: rgba(28,10,9,.7); }
+  .spacer { flex: 1; }
+  button.ghost {
+    background: var(--panel-deep); color: var(--muted); border: 2px solid var(--khaki-dim);
+    padding: 6px 11px; cursor: pointer; font: 700 10.5px/1 var(--mono);
+    letter-spacing: 1.4px; text-transform: uppercase; box-shadow: 3px 3px 0 #000;
+    transition: transform .09s steps(2), box-shadow .09s steps(2), background .12s, color .12s, border-color .12s;
+  }
+  button.ghost:hover { border-color: var(--khaki-hi); color: #fff; background: #241f16; }
+  button.ghost:active { transform: translate(3px,3px); box-shadow: 0 0 0 #000; }
+  button.ghost:disabled { opacity: .4; cursor: default; box-shadow: none; }
+
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ── 卡片 = cold-tiger 的框：卡其硬边 + 黑硬投影 + 扫描线 + 闪烁 ── */
+  .card {
+    position: relative; background: var(--panel); padding: 16px;
+    border: 6px solid var(--khaki); box-shadow: 6px 8px 0 #000; overflow: hidden; isolation: isolate;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: .28;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 2px);
+    animation: tv-static .2s infinite linear alternate;
+  }
+  .card::after {
+    content: ""; position: absolute; inset: 0; z-index: 7; pointer-events: none; opacity: .32;
+    background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,.25) 50%),
+                linear-gradient(90deg, rgba(255,0,0,.06), rgba(0,255,0,.02), rgba(0,0,255,.06));
+    background-size: 100% 2px, 3px 100%;
+    animation: tv-flicker .15s infinite;
+  }
+  @keyframes tv-flicker { 0%,100% { opacity: .32 } 50% { opacity: .18 } }
+  .card > * { position: relative; z-index: 5; }
+  .card h2 {
+    margin: 0 0 3px; font-size: 11px; font-weight: 700; letter-spacing: 2.4px;
+    color: #cbc4a8; text-transform: uppercase;
+  }
+  .card p.hint { margin: 0 0 15px; color: var(--faint); font-size: 11px; letter-spacing: .3px; }
+  .card code { background: #00000055; padding: 1px 4px; color: var(--khaki-hi); }
+
+  /* ── 主开关：结构还是 Nawsome 那个，配色换成卡其/磷光绿 ── */
+  .switch-row { display: flex; align-items: center; gap: 15px; padding: 4px 0 16px; }
+  .checker {
+    --duration: .25s;
+    position: relative; display: block; font-size: 20px;
+    height: 1em; width: 2.5em; box-sizing: content-box; padding: .15em;
+    cursor: pointer; flex: none;
+  }
+  .checker .check-bg {
+    position: absolute; inset: 0; background: #262218; z-index: 2;
+    border: 2px solid var(--khaki-dim);
+  }
+  .checker .check-bg::after { content: ""; position: absolute; inset: 0; background: #262218; }
+  .checker .check-bg::before {
+    content: ""; position: absolute; inset: 0; transform: translateY(28%);
+    background: #000; filter: blur(.22em); opacity: .45; z-index: -1;
+  }
+  .checker .checkmark { width: 1em; height: 1em; transform: translateX(-.4em); z-index: 5; position: relative; }
+  .checker .checkmark svg {
+    display: block; background: #8b8567; transform: translateX(.4em);
+    transition: background-color var(--duration) ease, transform calc(var(--duration) * 1.5) ease;
+  }
+  .checker .checkmark svg path {
+    stroke-dasharray: 90 90; stroke-dashoffset: 90;
+    transition: stroke-dashoffset calc(var(--duration) / 3) linear calc(var(--duration) / 3);
+  }
+  .checker .checkbox { position: absolute; inset: 0; opacity: 0; visibility: hidden; }
+  .checker .checkbox:checked ~ .checkmark { transform: translate(1.9em); }
+  .checker .checkbox:checked ~ .checkmark svg { background: var(--ok); transform: translate(-.4em); }
+  .checker .checkbox:checked ~ .checkmark svg path { stroke-dashoffset: 0; }
+  /* 打开时轨道也要亮，否则像"一个绿方块漂在暗框里" */
+  .checker .checkbox:checked ~ .check-bg { border-color: rgba(143,227,155,.7); background: #14261a; }
+  .checker .checkbox:checked ~ .check-bg::after { background: #14261a; }
+  .checker:active { transform: scale(.88); transition-duration: calc(var(--duration) / 2); }
+
+  .switch-label { display: flex; flex-direction: column; gap: 2px; }
+  .switch-label b { font-size: 13px; letter-spacing: 1.6px; text-transform: uppercase; color: #fff; }
+  .switch-label i { font-style: normal; color: var(--faint); font-size: 10.5px; letter-spacing: .4px; }
+
+  /* ── 版本选择：brutalism 方框 ── */
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 10px;
+    padding: 10px 11px; border: 2px solid var(--khaki-dim); background: var(--panel-deep);
+    cursor: pointer; box-shadow: 3px 3px 0 #000;
+    transition: transform .09s steps(2), box-shadow .09s steps(2), border-color .12s, background .12s;
+  }
+  .opt:hover { border-color: var(--khaki-hi); background: #241f16; }
+  .opt:active { transform: translate(3px,3px); box-shadow: 0 0 0 #000; }
+  .opt.sel { border-color: var(--khaki-hi); background: var(--khaki-hi); }
+  .opt.sel .name, .opt.sel .desc, .opt.sel .meta { color: #14130f; }
+  .opt .dot { width: 11px; height: 11px; border: 2px solid var(--khaki-dim); }
+  .opt.sel .dot { border-color: #14130f; background: #14130f; }
+  .opt .name { font-family: var(--mono); font-size: 12px; letter-spacing: 1.2px; color: var(--khaki-hi); }
+  .opt .desc { color: var(--faint); font-size: 10.5px; display: block; margin-top: 1px; }
+  .opt .meta { font: 10px var(--mono); color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
+  .opt[data-off="1"] { opacity: .38; pointer-events: none; }
+
+  /* ── 证据表：等宽 + 虚线 ── */
+  .evidence-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .state-badge {
+    font: 700 10.5px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase;
+    padding: 5px 9px; border: 1px solid;
+  }
+  .state-badge.ok { color: var(--ok); border-color: rgba(143,227,155,.5); background: rgba(10,26,14,.75); }
+  .state-badge.pending { color: var(--warn); border-color: rgba(232,180,92,.45); background: rgba(28,20,6,.75); }
+  .state-badge.bad { color: var(--bad); border-color: rgba(255,107,94,.45); background: rgba(28,10,9,.75); }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; table-layout: fixed; }
+  th, td { text-align: left; padding: 7px 5px; border-bottom: 1px dashed var(--line); vertical-align: top; }
+  th:nth-child(1), td:nth-child(1) { width: 88px; white-space: nowrap; }
+  th:nth-child(2), td:nth-child(2) { width: 42%; }
+  th:nth-child(4), td:nth-child(4) { width: 28px; text-align: right; }
+  th {
+    color: var(--faint); font-weight: 700; font-size: 9.5px; letter-spacing: 1.6px; text-transform: uppercase;
+    border-bottom: 2px solid var(--khaki-dim);
+  }
+  td { color: #ddd6c0; }
+  td.mono { font-family: var(--mono); font-size: 10.5px; color: #b9b294; }
+  .mark { font-family: var(--mono); font-weight: 700; }
+  .mark.ok { color: var(--ok); }
+  .mark.bad { color: var(--bad); }
+  .banner {
+    margin: 12px 0 0; padding: 9px 11px; font-size: 10.5px; line-height: 1.6;
+    border: 1px dashed rgba(232,180,92,.5); background: rgba(28,20,6,.7); color: var(--warn);
+  }
+  .banner.stale { border-color: rgba(255,107,94,.45); background: rgba(28,10,9,.7); color: #ffb4ae; }
+  .banner code { background: #00000055; padding: 1px 4px; color: var(--khaki-hi); }
+  .muted { color: var(--faint); }
+
+  /* 待组装：借同作者 brown-puma-30 的扫描条 */
+  .loader { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .loader .bar { flex: 1; height: 8px; border: 1px solid rgba(143,227,155,.45); position: relative; overflow: hidden; }
+  .loader .bar i {
+    position: absolute; top: 0; bottom: 0; width: 36%; background: var(--ok);
+    animation: lslide 1.6s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  @keyframes lslide { 0% { left: -38% } 100% { left: 100% } }
+  .loader .txt { font: 700 9.5px/1 var(--mono); letter-spacing: 1.6px; color: var(--ok); text-transform: uppercase; }
+
+  .log { margin-top: 18px; }
+  .log ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .log li {
+    display: grid; grid-template-columns: 78px 1fr; gap: 9px;
+    font: 10.5px var(--mono); color: #b9b294; letter-spacing: .3px;
+    padding: 6px 9px; border: 1px solid var(--line); background: var(--panel-deep);
+  }
+  .log li span.t { color: var(--faint); }
+  footer {
+    margin-top: 24px; color: var(--faint); font-size: 10px; font-family: var(--mono);
+    white-space: pre-line; letter-spacing: .3px;
+  }
+  .toast {
+    position: fixed; right: 18px; bottom: 18px; padding: 9px 13px;
+    background: var(--khaki-hi); color: #14130f; border: 2px solid #000;
+    font: 700 10.5px/1.4 var(--mono); letter-spacing: 1.2px; text-transform: uppercase;
+    box-shadow: 4px 4px 0 #000; opacity: 0; transform: translateY(8px);
+    transition: opacity .18s, transform .18s; pointer-events: none; z-index: 9999;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { background: var(--bad); color: #1a0605; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::after, .card::before, .card::after, .loader .bar i,
+    .bg-eye .sclera, .bg-eye .pupil, .bg-eye .lid { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-eye" aria-hidden="true">
+  <div class="sclera"><div class="pupil"></div><div class="lid"></div></div>
+</div>
+<div class="wrap">
+  <header>
+    <h1>bingbing 越狱开关台 <span id="ver">v—</span></h1>
+    <div id="statePill" class="pill">加载中…</div>
+    <div class="spacer"></div>
+    <button class="ghost" id="btnVerify">校验并刷新</button>
+    <button class="ghost" id="btnReset">复位（清除覆盖）</button>
+    <button class="ghost" id="btnStop">停止服务</button>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>控制</h2>
+      <p class="hint">切换写入 <code>override.json</code>，下一轮组装即生效，不需要重启宿主。</p>
+
+      <div class="switch-row">
+        <label class="checker" title="启用 / 取消越狱">
+          <input class="checkbox" type="checkbox" id="chkEnabled">
+          <div class="check-bg"></div>
+          <div class="checkmark">
+            <svg viewBox="0 0 100 100">
+              <path stroke-linejoin="round" stroke-linecap="round" stroke-width="15" stroke="#FFF" fill="none" d="M20,55 L40,75 L77,27"></path>
+            </svg>
+          </div>
+        </label>
+        <div class="switch-label">
+          <b id="enabledText">越狱</b>
+          <i id="enabledHint">读取中…</i>
+        </div>
+      </div>
+
+      <div class="opts" id="opts"></div>
+    </section>
+
+    <section class="card">
+      <h2>切换证据</h2>
+      <p class="hint">左边是当前配置应产生的段，右边是装配快照里的实际段；逐项比对，不靠自述。</p>
+      <div class="evidence-top">
+        <span id="evidenceBadge" class="state-badge pending">等待数据</span>
+        <span class="muted" id="evidenceTimes"></span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>段</th><th>期望（当前配置）</th><th>实际（快照）</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="banner" id="pendingBanner" hidden></div>
+
+      <div class="log">
+        <h2>切换历史</h2>
+        <ul id="logList"><li><span class="t">—</span><span class="muted">暂无</span></li></ul>
+      </div>
+    </section>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null;
+let busy = false;
+
+function toast(msg, isErr) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = "toast"; }, 2600);
+}
+
+function fmt(part) {
+  if (!part) return "缺失";
+  return part.bytes + " B · " + String(part.sha256).slice(0, 12);
+}
+
+function chip() {
+  if (!state) return ["加载中…", ""];
+  const e = state.effective;
+  if (!e.enabled) return ["已关闭", "off"];
+  return [e.promptSet, "on"];
+}
+
+function render() {
+  if (!state) return;
+  const e = state.effective;
+  $("ver").textContent = "v" + state.version;
+
+  const [label, cls] = chip();
+  const pill = $("statePill");
+  pill.textContent = e.enabled ? "生效中 · " + label : "已关闭 · 不投递越狱";
+  pill.className = "pill " + cls;
+
+  $("chkEnabled").checked = Boolean(e.enabled);
+  $("enabledText").textContent = e.enabled ? "越狱已启用" : "越狱已取消";
+  $("enabledHint").textContent = e.enabled
+    ? "三段内容会进入 system prompt"
+    : "三段清空，且不再过滤官方政策句";
+
+  const cat = [
+    ["v1", "纯正文", "只有 25128 B 正文，无 pre/post"],
+    ["v1+shell", "正文 + 前后包装", "默认：环境事实 + 正文 + 硬约束尾段"],
+    ["v2", "机制内核", "1.7 KB 机制版内核 + 前后包装"],
+  ];
+  $("opts").innerHTML = "";
+  for (const [id, name, desc] of cat) {
+    const el = document.createElement("div");
+    el.className = "opt" + (e.promptSet === id ? " sel" : "");
+    el.dataset.off = e.enabled ? "0" : "1";
+    el.innerHTML = '<span class="dot"></span><span><span class="name">' + id +
+      '</span><span class="desc">' + name + " — " + desc + '</span></span>' +
+      '<span class="meta">' + (id === e.promptSet ? "当前" : "点击切换") + "</span>";
+    el.onclick = () => switchTo({ promptSet: id });
+    $("opts").appendChild(el);
+  }
+
+  const rows = state.rows || [];
+  $("rows").innerHTML = rows.map((r) => {
+    const exp = r.textual ? r.expectedText : fmt(r.expected);
+    const act = r.textual ? r.actualText : fmt(r.actual);
+    return "<tr><td>" + r.label + '</td><td class="mono">' + exp + '</td><td class="mono">' + act +
+      '</td><td class="mark ' + (r.ok ? "ok" : "bad") + '">' + (r.ok ? "✓" : "✗") + "</td></tr>";
+  }).join("");
+
+  const badge = $("evidenceBadge");
+  const ev = state.evidence || {};
+  if (ev.matched) { badge.className = "state-badge ok"; badge.textContent = "已生效 ✓"; }
+  else if (ev.codeStale) { badge.className = "state-badge bad"; badge.textContent = "需重启一次"; }
+  else if (ev.pending) { badge.className = "state-badge pending"; badge.textContent = "等待下一次组装"; }
+  else { badge.className = "state-badge bad"; badge.textContent = "不一致 ✗"; }
+
+  $("evidenceTimes").textContent = ev.summary + (ev.snapshotAt ? " ｜ 快照 " + new Date(ev.snapshotAt).toLocaleTimeString() : "");
+
+  const banner = $("pendingBanner");
+  if (ev.codeStale) {
+    banner.hidden = false;
+    banner.className = "banner stale";
+    banner.innerHTML = "<b>运行中的宿主还是旧版插件。</b>覆盖文件已经写进去了，但旧代码不认识它——" +
+      "判据是装配快照里缺 <code>enabled</code> 字段（新版才会写）。<br>" +
+      "退出宿主再打开一次（托盘 → 退出），之后每次切换都是即时生效、不用再重启。";
+  } else if (ev.pending) {
+    banner.hidden = false;
+    banner.className = "banner";
+    // 待组装用滚动条（借同作者 brown-puma-30 的骨），比干等文字直观
+    banner.innerHTML = '<div class="loader"><span class="txt">WAITING</span><span class="bar"><i></i></span></div>' +
+      '<div style="margin-top:9px">已切换，但宿主还没重新组装过。在 GUI 里随便发一句话（或新建会话），' +
+      '快照会立刻刷新，这里自动变成「已生效」。</div>';
+  } else if (!ev.matched && state.snapshot) {
+    banner.hidden = false;
+    banner.className = "banner stale";
+    banner.textContent = "快照已组装过但仍与期望不符：宿主加载的可能是旧代码，或者 override 没写到 state 目录。";
+  } else {
+    banner.hidden = true;
+  }
+
+  const log = state.log || [];
+  $("logList").innerHTML = log.length
+    ? log.map((l) => {
+        const t = new Date(l.at).toLocaleTimeString();
+        const what = l.patch && l.patch.reset
+          ? "复位清除覆盖"
+          : Object.entries(l.patch || {}).map(([k, v]) => k + "=" + v).join(" ");
+        const to = l.after
+          ? "enabled=" + l.after.enabled + " promptSet=" + l.after.promptSet
+          : l.overrideAfter
+            ? "override=" + JSON.stringify(l.overrideAfter)
+            : "默认";
+        return '<li><span class="t">' + t + '</span><span>' + what + ' <span class="muted">→ ' + to + "</span></span></li>";
+      }).join("")
+    : '<li><span class="t">—</span><span class="muted">暂无切换记录</span></li>';
+
+  $("footer").textContent = state.paths
+    ? "state: " + state.paths.state + "\noverride: " + state.paths.override +
+      (state.capability ? "\n代码能力: " + state.capability.note : "")
+    : "";
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    state = await r.json();
+    render();
+  } catch (e) {
+    toast("读取状态失败：" + e.message, true);
+  }
+}
+
+async function switchTo(patch) {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await fetch("/api/switch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "切换失败");
+    state = data.state;
+    render();
+    toast("已写入：" + Object.entries(patch).map(([k, v]) => k + "=" + v).join(" "));
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+$("chkEnabled").addEventListener("change", (ev) => switchTo({ enabled: ev.target.checked }));
+$("btnReset").addEventListener("click", async () => {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await fetch("/api/reset", { method: "POST" });
+    const data = await r.json();
+    state = data.state;
+    render();
+    toast("已清除运行时覆盖");
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    busy = false;
+  }
+});
+$("btnVerify").addEventListener("click", async () => {
+  await load();
+  try {
+    const r = await fetch("/api/verify");
+    const v = await r.json();
+    toast("校验：" + v.verdict);
+  } catch (e) {
+    toast(e.message, true);
+  }
+});
+$("btnStop").addEventListener("click", async () => {
+  try {
+    await fetch("/api/shutdown", { method: "POST" });
+    toast("服务已停止，可关闭此页");
+  } catch {
+    toast("服务已停止", true);
+  }
+});
+
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>

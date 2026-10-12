@@ -1,0 +1,28 @@
+# bingbing —— 加载即生效：三段提示词投递 + 策略上下文过滤
+# 只写 $DSH_HOME 与自身状态；不写宿主文件，不解 asar。
+- insert:
+    - id: bingbing
+      name: 'bingbing'
+      config:
+        enabled: true
+
+        # v1 | v1+shell | v2
+        #   v1       = 只用现行 prompt-inject.md，无包装
+        #   v1+shell = 现行正文逐字 + pre/post 两段包装（默认）
+        #   v2       = 机制型内核（prompts/v2/core.md）+ 同样的 pre/post
+        promptSet: 'v1+shell'
+
+        # 核心段在 system prompt 里的顺序（默认 5100，夹在 TOOLS_SDK 之后）
+        promptOrder: 5100
+
+        # 过滤 contexts 里的审批/沙箱政策句（waterfall，只过滤不新增）
+        filterPolicyContexts: true
+
+        # 过滤 sections 里的 harness:identity 身份段（complete 段会被宿主恢复，属已知上限）
+        filterIdentitySections: true
+
+        # 显式指定正文；留空 = $DSH_HOME/prompt-inject.md > 随包 prompts/v1 副本
+        promptFile: ""
+
+        # 是否把每次 assemble 的证据落盘（last-assembly.json / filtered.jsonl）
+        trace: true

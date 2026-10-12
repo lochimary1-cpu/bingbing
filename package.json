@@ -1,0 +1,57 @@
+{
+  "name": "bingbing",
+  "version": "0.10.3",
+  "description": "DeepSeek Harness 插件的越狱开关台：三段提示词 + 证据表 + 版本切换",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "bingbing": "bin/bingbing.js",
+    "bingbing-ui": "bin/bingbing-ui.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "ui",
+    "prompts",
+    "cordis.patch.yml",
+    "install.cmd",
+    "bingbing.cmd",
+    "一键安装.cmd",
+    "HOW-TO-INSTALL.txt",
+    "NOTICE",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots"
+      ]
+    }
+  },
+  "scripts": {
+    "selftest": "node tests/selftest.mjs",
+    "check": "node bin/bingbing.js check",
+    "status": "node bin/bingbing.js status",
+    "ui": "node bin/bingbing-ui.mjs",
+    "ui:open": "node bin/bingbing-ui.mjs --open",
+    "verify": "node tools/acceptance.mjs",
+    "dist": "node tools/build-dist.mjs",
+    "dist:full": "node tools/build-dist.mjs --full"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "lochimary1 <lochimary1@gmail.com>",
+  "license": "MIT"
+}
