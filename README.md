@@ -70,7 +70,7 @@ bin/      命令行（install / doctor / update / 独立网页版）
 lib/      插件本体，l0/ 是提示词层，update/ 是版本与更新
 ui/       独立网页版面板
 prompts/  三段 shell 和内置正文
-tests/    自测（41 条）
+tests/    自测（47 条）
 tools/    打包和验收脚本
 docs/     截图
 ```
@@ -78,6 +78,10 @@ docs/     截图
 ## 几点说明
 
 - 只写 `$DSH_HOME` 和 profile 目录，不碰 Harness 安装目录，不解 `app.asar`。
+- 面板只接回环 origin 的请求，跨站请求一律 403（不再回 `Access-Control-Allow-Origin: *`）。
+  需要别的来源就设 `BINGBING_PANEL_ORIGINS`，逗号分隔。
+- 版本号按 `1.2.3` 白名单校验：它会被当成目录名用，远端 tgz 里的 `package.json` 说
+  `../../x` 也不会写到 `versions/` 外面。
 - `prompts/` 是每次组装现读磁盘的，改完下一轮生效；改 `lib/` 要重启。
 - 只在 Windows + Harness 0.2.x 桌面版上试过，junction 和 `.cmd` 都是 Windows 的。
 - 方向来自 [YuJunZhiXue/dsh-purge](https://github.com/YuJunZhiXue/dsh-purge)（小杨，MIT），

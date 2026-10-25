@@ -23,6 +23,7 @@ fs.writeFileSync(path.join(HOME, "prompt-inject.md"), CORE_TEXT, "utf8");
 const { apply } = await import("../lib/index.js");
 const { staticProbes } = await import("../lib/core/canary.js");
 const { resolveCore } = await import("../lib/l0/prompt.js");
+const { BOOT_ID } = await import("../lib/core/state.js");
 
 const results = [];
 const check = (id, ok, detail) => {
@@ -123,6 +124,9 @@ check(
 );
 check("W3", !out.sections.some((s) => s.name === "harness:identity"), "identity 段被过滤");
 check("W4", out.sections.some((s) => s.name === "bingbing:post"), "post 段仍在");
+// 快照必须带进程标识：没有它就分不清"本进程刚组装过"和"读到上一个进程的旧快照"
+const bootSnap = JSON.parse(fs.readFileSync(path.join(HOME, "state", "bingbing", "last-assembly.json"), "utf8"));
+check("W5", bootSnap.bootId === BOOT_ID, `装配快照带本进程 bootId：${String(bootSnap.bootId).slice(0, 8)}…`);
 
 // ---- 2.5 M2：结构对等 / M4：工具描述契约 ----------------------------------
 const sameContextNames =
@@ -321,6 +325,79 @@ check(
   "U8",
   settledFail.action === "rolled-back" && reg.activeVersion() === "0.9.0",
   `FAIL 自动回滚：action=${settledFail.action} active=${reg.activeVersion()}`,
+);
+
+// ---- 安全硬化（U9–U11）----------------------------------------------------
+// U9 版本号当路径用，必须先过白名单（远端 tgz 的 package.json 是第三方内容）
+let badVersions = 0;
+for (const bad of ["../../evil", "/abs/1.0.0", "1.0.0/../../x", "dev", ""]) {
+  try {
+    reg.versionDir(bad);
+  } catch {
+    badVersions += 1;
+  }
+}
+check(
+  "U9",
+  badVersions === 5 && reg.versionDir("1.2.3") === path.join(reg.versionsDir(), "1.2.3"),
+  `版本号白名单挡住 ${badVersions}/5 个异常值，合法值仍可用`,
+);
+
+// U10 自动回滚之后 pending 必须清掉（否则面板永久自相矛盾）
+for (const ver of ["0.9.2", "0.9.3"]) {
+  fs.mkdirSync(reg.versionDir(ver), { recursive: true });
+  fs.writeFileSync(path.join(reg.versionDir(ver), "package.json"), JSON.stringify({ name: "bingbing", version: ver }));
+}
+reg.activate("0.9.2");
+reg.activate("0.9.3");
+const rolled = svc.settlePending(() => ({ verdict: "FAIL", probes: [{ id: "S4", ok: false }] }));
+const markerPath = path.join(HOME, "state", "bingbing", "rollback-needed.json");
+check(
+  "U10",
+  rolled.action === "rolled-back" && reg.readPending() === null && reg.activeVersion() === "0.9.2" && fs.existsSync(markerPath),
+  `回滚后 pending 已清：action=${rolled.action} active=${reg.activeVersion()} pending=${JSON.stringify(reg.readPending())}`,
+);
+
+// U10b 历史残留的"待确认但不是当前版本"要能自愈，不再 pending-not-active 死循环
+fs.writeFileSync(
+  path.join(HOME, "state", "bingbing", "pending.json"),
+  JSON.stringify({ from: "0.9.2", to: "0.9.3", at: new Date().toISOString(), attempts: 1 }),
+);
+const healed = svc.settlePending(() => ({ verdict: "PASS", probes: [{ ok: true }] }));
+check(
+  "U10b",
+  healed.reason === "pending-not-active" && healed.cleared === true && reg.readPending() === null,
+  `残留 pending 自愈：${JSON.stringify(healed)}`,
+);
+
+// U11 结算只认本进程的快照：跨进程快照一律 N/A（否则坏版本会被判 PASS）
+const snapPath = path.join(HOME, "state", "bingbing", "last-assembly.json");
+fs.writeFileSync(
+  snapPath,
+  JSON.stringify({
+    at: new Date().toISOString(),
+    bootId: "another-process",
+    enabled: true,
+    promptSet: "v1+shell",
+    assemblies: 7,
+    sections: [],
+    contexts: [],
+    dropped: [],
+    rewritten: [],
+  }),
+);
+const foreign = staticProbes(resolveCore({}), { sameBootId: "this-process" });
+const sameBoot = staticProbes(resolveCore({}), { sameBootId: "another-process" });
+const audit = staticProbes(resolveCore({}));
+check(
+  "U11",
+  foreign.summary.verdict === "UNKNOWN" && foreign.summary.unknown === 5,
+  `跨进程快照不下判断：verdict=${foreign.summary.verdict} unknown=${foreign.summary.unknown}`,
+);
+check(
+  "U11b",
+  sameBoot.summary.verdict !== "UNKNOWN" && audit.summary.verdict !== "UNKNOWN",
+  `同 bootId / 审计模式仍下判断：own=${sameBoot.summary.verdict} audit=${audit.summary.verdict}`,
 );
 
 // ---- 汇总 ----------------------------------------------------------------

@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { applyReset, applySwitch, buildState } from "../lib/l0/panel.js";
 import { handleUpdateRoute } from "../lib/update/routes.js";
+import { applyCors, rejectReason } from "../lib/core/http-guard.js";
 
 const PKG_ROOT = fileURLToPath(new URL("../", import.meta.url));
 const UI_DIR = path.join(PKG_ROOT, "ui");
@@ -81,6 +82,16 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
   const route = url.pathname;
   try {
+    // 与宿主内面板同一道闸：只接受回环 origin，跨站请求直接 403。
+    // （本页是 same-origin，用户自己的 curl 不带 Origin，两者都放行。）
+    applyCors(res, String(req.headers.origin ?? ""));
+    const deny = rejectReason(req);
+    if (deny) return sendJson(res, 403, { error: deny });
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return undefined;
+    }
     if (route === "/api/state" && req.method === "GET") return sendJson(res, 200, buildState());
     if (route === "/bingbing/api/state" && req.method === "GET") return sendJson(res, 200, buildState());
 
