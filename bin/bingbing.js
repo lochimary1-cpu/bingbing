@@ -53,6 +53,7 @@ const USAGE = `bingbing ${PKG.version} —— DSH 插件
   bingbing update status      已安装版本 / 当前生效 / 待重启
   bingbing update check       查 GitHub Releases 有没有新版
   bingbing update install X   下载并解包 X（或 latest），不激活
+                              --force 覆盖正在生效的版本（默认拒绝）
   bingbing update switch X    切到 X，并生成 restart.cmd
   bingbing update rollback    切回上一版（pending.from）
   bingbing update restart     生成 restart.cmd（双击重启宿主）
@@ -522,8 +523,12 @@ async function updateCommand() {
 }
 
 async function updateCommandInner() {
-  const sub = argv[1] && !argv[1].startsWith("-") ? argv[1] : "status";
-  const target = argv[2] && !argv[2].startsWith("-") ? argv[2] : null;
+  // 先摘掉 --force / --json 这类开关，再按位置取子命令与目标：
+  // 否则 `update install --force latest` 会把 "--force" 当成版本号。
+  const rest = argv.slice(1).filter((arg) => !arg.startsWith("-"));
+  const sub = rest[0] || "status";
+  const target = rest[1] || null;
+  const force = argv.includes("--force");
 
   if (sub === "status") {
     const s = updateStatus();
@@ -586,8 +591,8 @@ async function updateCommandInner() {
         return 1;
       }
     }
-    step(`安装 ${version}`);
-    const record = await updateInstall({}, version);
+    step(`安装 ${version}${force ? "（--force：允许覆盖正在生效的版本）" : ""}`);
+    const record = await updateInstall({}, version, { force });
     ok(`${record.ver} 已解包（${record.files} 文件，${Math.round(record.bytes / 1024)} KB，源 ${record.source}）`);
     console.log(`\n  激活：node bin\\bingbing.js update switch ${record.ver}\n`);
     return 0;

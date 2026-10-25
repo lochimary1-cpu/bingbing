@@ -63,6 +63,11 @@ profile 里 `node_modules/bingbing` 指向 `state/bingbing/current`，`current` 
 
 切完写 `pending.json`，重启 60 秒后跑一遍静态探针：过了就确认，没过就自动切回上一版。
 
+装新版本是"先解包、再换名"：老目录先挪到 `state/bingbing/.trash`，新目录 rename 就位，
+成功后才删旧副本——任何一步失败都还能退回原版本。正在生效的版本默认**不允许**被覆盖
+（`update install --force` 才放行），否则 `current` 会短暂悬空，Windows 上被打断就再也
+加载不上，而面板在插件里，等于连修复入口都没了。
+
 ## 目录
 
 ```
@@ -70,7 +75,7 @@ bin/      命令行（install / doctor / update / 独立网页版）
 lib/      插件本体，l0/ 是提示词层，update/ 是版本与更新
 ui/       独立网页版面板
 prompts/  三段 shell 和内置正文
-tests/    自测（47 条）
+tests/    自测（51 条）
 tools/    打包和验收脚本
 docs/     截图
 ```

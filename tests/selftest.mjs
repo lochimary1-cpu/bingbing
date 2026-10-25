@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 
 const verbose = process.argv.includes("-v");
 // 自测里不要真起面板端口：apply() 会启动本地 HTTP 服务，这里只需要机制。
@@ -398,6 +399,73 @@ check(
   "U11b",
   sameBoot.summary.verdict !== "UNKNOWN" && audit.summary.verdict !== "UNKNOWN",
   `同 bootId / 审计模式仍下判断：own=${sameBoot.summary.verdict} audit=${audit.summary.verdict}`,
+);
+
+// ---- 安装的原子性（U12）---------------------------------------------------
+// 造一个最小 tgz（ustar 头 + 数据 + 两个空块），不依赖 tar 命令，也不依赖 dist/
+function makeTgz(files) {
+  const blocks = [];
+  for (const [name, text] of Object.entries(files)) {
+    const data = Buffer.from(text, "utf8");
+    const header = Buffer.alloc(512, 0);
+    header.write(name, 0, 100, "utf8");
+    header.write("0000644\0", 100, 8);
+    header.write("0000000\0", 108, 8);
+    header.write("0000000\0", 116, 8);
+    header.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124, 12);
+    header.write("00000000000\0", 136, 12);
+    header.write("        ", 148, 8);
+    header.write("0", 156, 1);
+    header.write("ustar\u000000", 257, 8);
+    let sum = 0;
+    for (const byte of header) sum += byte;
+    header.write(`${sum.toString(8).padStart(6, "0")}\0 `, 148, 8);
+    blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512, 0));
+  }
+  blocks.push(Buffer.alloc(1024, 0));
+  return zlib.gzipSync(Buffer.concat(blocks));
+}
+
+const tgz = makeTgz({
+  "package.json": JSON.stringify({ name: "bingbing", version: "1.1.0" }),
+  "lib/index.js": "export default {};\n",
+});
+
+const first = reg.installTgz(tgz, { source: "selftest", expect: "1.1.0" });
+check(
+  "U12",
+  first.ver === "1.1.0" && fs.existsSync(path.join(reg.versionDir("1.1.0"), "lib", "index.js")),
+  `首次安装：${first.files} 文件，目录已就位`,
+);
+
+// 覆盖已装（非生效）版本：老副本进 .trash、装完即删，不留残渣
+const over = reg.installTgz(tgz, { source: "selftest", expect: "1.1.0" });
+const trashClean = !fs.existsSync(reg.trashDir()) || fs.readdirSync(reg.trashDir()).length === 0;
+check(
+  "U12b",
+  over.replaced === true && fs.existsSync(path.join(reg.versionDir("1.1.0"), "package.json")) && trashClean,
+  `覆盖已装版本：replaced=${over.replaced}，.trash 残留=${trashClean ? "无" : "有"}`,
+);
+
+// 正在生效的版本默认拒绝覆盖（否则 current 会短暂悬空，插件可能加载不上）
+reg.activate("1.1.0");
+let refused = false;
+try {
+  reg.installTgz(tgz, { source: "selftest", expect: "1.1.0" });
+} catch {
+  refused = true;
+}
+check(
+  "U12c",
+  refused && fs.existsSync(reg.versionDir("1.1.0")),
+  "正在生效的版本默认拒绝覆盖，且原目录仍在",
+);
+
+const forced = reg.installTgz(tgz, { source: "selftest", expect: "1.1.0", force: true });
+check(
+  "U12d",
+  forced.replaced === true && fs.existsSync(path.join(reg.versionDir("1.1.0"), "package.json")),
+  "force 覆盖成功，目录结构完好",
 );
 
 // ---- 汇总 ----------------------------------------------------------------
