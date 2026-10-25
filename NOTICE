@@ -1,9 +1,35 @@
 NOTICE
 
-这个插件最早是看了 YuJunZhiXue/dsh-purge（作者 小杨，MIT）之后，才知道可以在
-Harness 宿主层做提示词注入、处理系统提示文本的。方向受它启发，在这里署名。
+## 上游署名
 
-现在的代码是重写的，没有包含 dsh-purge 的源码或提示词。
+方向来自 YuJunZhiXue/dsh-purge（作者：小杨，MIT）：
 
-更早还有一份 dsh-purge-ultra（带宿主代码 patch 的那种），2026 年 10 月已经从
-这个仓库移出去了，不随仓库、压缩包或安装包分发。
+  仓库  https://github.com/YuJunZhiXue/dsh-purge
+  作者  小杨（MIT License，Copyright (c) 2026 小杨）
+  性质  非盈利项目，禁止商业售卖、付费倒卖与黑灰产牟利；
+        借用其名称、思路、代码或提示词必须署名并写明来源仓库
+
+知道可以在 DSH 宿主层注册 section、在 system-prompt/assemble 里处置审批句与沙箱句，
+是从这个项目开始的。据此致谢。
+
+## 借了什么
+
+- 思路与方向：宿主层投递（section 注册）+ 组装时处置政策文本 + 一个本地面板。
+- 接口形态：DSH 插件的写法由宿主接口强制（cordis.patch.yml、export const inject、
+  section()），任何插件都长这样，这部分不是上游的独创。
+
+## 没借什么
+
+当前仓库不含 dsh-purge 的源码、提示词或文档。逐字重合度按 40 字符 shingle 审过：
+正文与三段包装段 0.00%，全树最高 0.63%（lib/index.js，命中的是 Cordis 的报错字符串）。
+审计工具与判据在私有目录 bingbing-notes/PROVENANCE.md，不随本仓库分发。
+
+## 更早的实验版本
+
+dsh-purge-ultra（带宿主代码 patch 的那套）已于 2026-10-24 移出仓库，
+不随本仓库、压缩包或安装包分发。
+
+## 使用声明
+
+禁止商业用途，禁止恶意攻击与黑灰产用途。一切使用后果由使用者自行承担，
+作者不承担任何直接、间接或连带责任。全文见 README 的「使用声明」。

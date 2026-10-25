@@ -428,10 +428,12 @@ function render() {
       }).join("")
     : '<li><span class="t">—</span><span class="muted">暂无切换记录</span></li>';
 
+  const credit = "思路来源: YuJunZhiXue/dsh-purge（小杨，MIT）｜ 禁止商业用途与恶意用途，后果自负";
   $("footer").textContent = state.paths
     ? "state: " + state.paths.state + "\noverride: " + state.paths.override +
-      (state.capability ? "\n代码能力: " + state.capability.note : "")
-    : "";
+      (state.capability ? "\n代码能力: " + state.capability.note : "") +
+      "\n" + credit
+    : credit;
 }
 
 async function load() {
